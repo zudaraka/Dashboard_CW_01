@@ -5,6 +5,8 @@ from bokeh.io import output_file, save
 from bokeh.models import GeoJSONDataSource, LinearColorMapper, ColorBar, HoverTool
 from bokeh.palettes import Viridis256
 from bokeh.plotting import figure
+from bokeh.models import HoverTool
+from bokeh.models import LinearColorMapper, ColorBar, HoverTool   # add HoverTool
 
 # ---------- name helpers ----------
 DISTRICT_KEYS = ["shapeName", "NAME_2", "name", "district", "DISTRICT"]
@@ -92,3 +94,20 @@ def main():
 
 if __name__ == "__main__":
     main()
+color_mapper = LinearColorMapper(palette=palette, low=0, high=vmax)
+color_mapper.nan_color = "#eeeeee"   # grey for districts with no data
+r = p.patches(
+    "xs", "ys",
+    source=source,
+    fill_color={"field": "incidence_per_100k", "transform": color_mapper},
+    line_color="#666", line_width=0.5
+)
+
+p.add_tools(HoverTool(
+    tooltips=[
+        ("District", "@district"),
+        ("Cases", "@cases{0,0}"),
+        ("Incidence/100k", "@incidence_per_100k{0.0}")
+    ],
+    renderers=[r]   # limits hover to the map polygons
+))
