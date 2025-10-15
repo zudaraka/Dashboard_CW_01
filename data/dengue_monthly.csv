@@ -1,3 +1,10 @@
+year,month,district,cases,population,incidence_per_100k
+2024,01,Colombo,1234,2415000,
+2024,01,Gampaha,987,2394000,
+2024,02,Colombo,1100,2415000,
+2024,02,Gampaha,1020,2394000,
+2024,03,Colombo,950,2415000,
+2024,03,Gampaha,980,2394000,
 2024,04,Colombo,900,2415000,
 2024,04,Gampaha,970,2394000,
 2024,05,Colombo,1100,2415000,
