@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""
+Build a single-month dengue choropleth to docs/choropleth_YYYY_MM.html
+Usage: python app/build_map.py --year 2024 --month 8 [--vmax 150]
+"""
+
 import argparse, json, os, calendar
 import pandas as pd
 from bokeh.io import output_file, save
@@ -24,8 +29,9 @@ def load_geojson(path: str):
         gj = json.load(f)
     for feat in gj["features"]:
         props = feat["properties"]
-        props["_district_norm"] = norm(pick_geo_name(props))
-        props["district"] = pick_geo_name(props)  # canonical label for tooltips
+        label = pick_geo_name(props)
+        props["_district_norm"] = norm(label)
+        props["district"] = label  # label for tooltip
     return gj
 
 def load_month(csv_path: str, year: int, month: int) -> pd.DataFrame:
@@ -52,24 +58,33 @@ def main():
     gj = load_geojson("data/sri_lanka_districts.geojson")
     mdf = load_month("data/dengue_monthly.csv", args.year, args.month)
 
-    # attach metrics into feature properties
+    # attach metrics into feature properties (+ pretty strings for hover)
     metrics = mdf.set_index("district_norm")[["incidence_per_100k", "cases", "population"]].to_dict("index")
     for feat in gj["features"]:
-        key = feat["properties"]["_district_norm"]
-        vals = metrics.get(key)
+        props = feat["properties"]
+        vals = metrics.get(props["_district_norm"])
         if vals:
-            feat["properties"].update(vals)
+            inc = vals.get("incidence_per_100k")
+            cases = vals.get("cases")
+            pop = vals.get("population")
+            props["incidence_per_100k"] = float(inc) if pd.notna(inc) else float("nan")
+            props["cases"] = float(cases) if pd.notna(cases) else None
+            props["population"] = float(pop) if pd.notna(pop) else None
         else:
-            # leave as None so NaNs render as grey and tooltips show blanks instead of 0
-            feat["properties"].setdefault("incidence_per_100k", None)
-            feat["properties"].setdefault("cases", None)
-            feat["properties"].setdefault("population", None)
+            props["incidence_per_100k"] = float("nan")
+            props["cases"] = None
+            props["population"] = None
+
+        # formatted strings so tooltips don't show 'nan'
+        props["cases_text"] = "" if pd.isna(props["cases"]) else f"{int(props['cases']):,}"
+        props["inc_text"]  = "" if pd.isna(props["incidence_per_100k"]) else f"{props['incidence_per_100k']:.1f}"
+        props["pop_text"]  = "" if pd.isna(props["population"]) else f"{int(props['population']):,}"
 
     source = GeoJSONDataSource(geojson=json.dumps(gj))
     vmax = args.vmax or (mdf["incidence_per_100k"].quantile(0.95) if not mdf.empty else 1.0)
 
     color_mapper = LinearColorMapper(palette=Viridis256, low=0, high=float(vmax))
-    color_mapper.nan_color = "#eeeeee"   # grey for districts with no data
+    color_mapper.nan_color = "#eeeeee"  # grey for districts with no data
 
     p = figure(
         width=900, height=600,
@@ -89,8 +104,9 @@ def main():
     p.add_tools(HoverTool(
         tooltips=[
             ("District", "@district"),
-            ("Cases", "@cases{0,0}"),
-            ("Incidence/100k", "@incidence_per_100k{0.0}")
+            ("Cases", "@cases_text"),
+            ("Incidence/100k", "@inc_text"),
+            ("Population", "@pop_text"),
         ],
         renderers=[r]
     ))
